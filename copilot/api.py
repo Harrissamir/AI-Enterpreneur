@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from collections import defaultdict, deque
 from threading import Lock
@@ -80,7 +81,12 @@ def create_app(settings: Settings | None = None, copilot: Copilot | None = None)
 
     @app.get("/health")
     def health():
-        return {"ok": True, "version": __version__, "personas": sorted(personas)}
+        provider = getattr(copilot.provider, "name", "unknown")
+        key = settings.groq_api_key if provider == "groq" else settings.anthropic_api_key
+        return {"ok": True, "version": __version__, "personas": sorted(personas),
+                "provider": provider, "model": getattr(copilot.provider, "model", None),
+                "api_key_set": bool(key and key.strip().lower() not in {"none", ""}),
+                "commit": os.getenv("RENDER_GIT_COMMIT", "")[:7]}
 
     @app.get("/v1/personas/{persona_id}")
     def persona_config(persona_id: str):
