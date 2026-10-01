@@ -3,6 +3,7 @@ services:
   - type: web
     name: business-copilot
     runtime: docker
+    plan: free
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -17,7 +18,7 @@ services:
       - key: DAILY_TOKEN_BUDGET
         value: "1500000"
     # Without a persistent disk, the SQLite lead log resets on each deploy.
-    # Leads are still delivered through LEAD_WEBHOOK_URL. On a paid plan, uncomment:
+    # Leads are still delivered through LEAD_WEBHOOK_URL. On a paid plan (change plan above), uncomment:
     # disk:
     #   name: copilot-data
     #   mountPath: /data
