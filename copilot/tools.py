@@ -152,8 +152,8 @@ def _draft_role_brief(args: dict, ctx: ToolContext) -> str:
 
 
 def _send_webhook(ctx: ToolContext, payload: dict) -> None:
-    if not ctx.webhook_url:
-        return
+    if not ctx.webhook_url.lower().startswith(("https://", "http://")):
+        return  # empty or a placeholder such as "none": webhook switched off
     try:
         httpx.post(ctx.webhook_url, json=payload, timeout=8)
     except httpx.HTTPError:
