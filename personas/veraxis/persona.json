@@ -1,0 +1,22 @@
+{
+  "id": "veraxis",
+  "brand": "VERAXIS Advisory",
+  "assistant_name": "VERAXIS Assistant",
+  "tagline": "Una via non sufficit.",
+  "greeting": "Welcome to VERAXIS Advisory. I can explain our domains, how engagements and fees work, and help you prepare an enquiry for a scoping conversation. Please don't share confidential or classified information here.",
+  "starter_questions": [
+    "Which domains does VERAXIS cover?",
+    "How does an engagement and fee work?",
+    "Can you review a public programme independently?",
+    "Prepare an enquiry for a scoping conversation"
+  ],
+  "booking_url": "https://xveraxis.lovable.app/contact",
+  "contact_url": "https://xveraxis.lovable.app/contact",
+  "accent": "#1E2B26",
+  "allowed_origins": [
+    "https://xveraxis.lovable.app"
+  ],
+  "tools": ["capture_lead", "offer_booking"],
+  "model": null,
+  "max_tokens": 900
+}

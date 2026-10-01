@@ -1,0 +1,24 @@
+{
+  "id": "harris_sons",
+  "brand": "Harris & Sons",
+  "assistant_name": "Harris & Sons Hiring Copilot",
+  "tagline": "India hiring & employment compliance, answered.",
+  "greeting": "Hi — I help EU, UK and international teams hire their first people in India and stay compliant. What are you trying to hire for, or which rule are you unsure about?",
+  "starter_questions": [
+    "EOR or our own Indian entity — which should we use?",
+    "What changed for employers under the 2025 Labour Codes?",
+    "Help me scope a senior engineering hire in India",
+    "Do we need a PoSH committee for a team of 12?"
+  ],
+  "booking_url": "https://calendar.app.google/ZyRrNPuS8i9b1PSm8",
+  "contact_url": "https://harrisandsons.lovable.app/contact",
+  "accent": "#1F3A5F",
+  "allowed_origins": [
+    "https://harrisandsons.lovable.app",
+    "https://harrisandsons.com",
+    "https://www.harrisandsons.com"
+  ],
+  "tools": ["capture_lead", "offer_booking", "draft_role_brief"],
+  "model": null,
+  "max_tokens": 900
+}

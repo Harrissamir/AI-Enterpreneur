@@ -1,0 +1,24 @@
+# One-click deploy on Render: New + > Blueprint > pick this repo.
+services:
+  - type: web
+    name: business-copilot
+    runtime: docker
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: LEAD_WEBHOOK_URL
+        sync: false
+      - key: COPILOT_MODEL
+        value: claude-haiku-4-5-20251001
+      - key: DAILY_TOKEN_BUDGET
+        value: "1500000"
+    # Without a persistent disk, the SQLite lead log resets on each deploy.
+    # Leads are still delivered through LEAD_WEBHOOK_URL. On a paid plan, uncomment:
+    # disk:
+    #   name: copilot-data
+    #   mountPath: /data
+    #   sizeGB: 1

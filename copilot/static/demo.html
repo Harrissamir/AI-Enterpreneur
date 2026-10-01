@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Copilot Demo</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #eef1f4; color: #1b1f24; }
+    main { max-width: 720px; margin: 0 auto; padding: 48px 16px; }
+    h1 { font-size: 28px; margin: 0 0 8px; }
+    p { line-height: 1.55; }
+    code { background: #fff; border: 1px solid #d7dce1; border-radius: 6px; padding: 2px 6px; }
+    .switch a { margin-right: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Copilot demo page</h1>
+    <p>This page stands in for your website. The chat button in the corner is the same widget your sites will load.</p>
+    <p class="switch">Persona: <a href="?persona=harris_sons">Harris &amp; Sons</a><a href="?persona=veraxis">VERAXIS</a></p>
+    <p>Embed with: <code>&lt;script src="/widget.js" data-persona="harris_sons" async&gt;&lt;/script&gt;</code></p>
+  </main>
+  <script>
+    var persona = new URLSearchParams(location.search).get("persona") || "harris_sons";
+    var s = document.createElement("script");
+    s.src = "/widget.js"; s.async = true;
+    s.setAttribute("data-persona", persona);
+    s.setAttribute("data-open", "true");
+    document.body.appendChild(s);
+  </script>
+</body>
+</html>
