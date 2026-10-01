@@ -1,4 +1,4 @@
-"""The conversation engine: Claude + tools + guardrails."""
+"""The conversation engine: model provider + tools + guardrails."""
 
 from __future__ import annotations
 
@@ -9,12 +9,11 @@ import anthropic
 
 from .config import Settings
 from .personas import Persona
+from .providers import AnthropicProvider, ProviderError, build_provider
 from .store import Store
 from .tools import ToolContext, run_tool, tool_definitions
 
 log = logging.getLogger("copilot.engine")
-
-MAX_TOOL_ROUNDS = 4
 
 
 class CopilotError(Exception):
@@ -55,19 +54,13 @@ def clean_history(messages: list[dict], max_messages: int, max_chars: int) -> li
 
 class Copilot:
     def __init__(self, settings: Settings, store: Store, personas: dict[str, Persona],
-                 client: anthropic.Anthropic | None = None):
+                 client: anthropic.Anthropic | None = None, provider=None):
         self.settings = settings
         self.store = store
         self.personas = personas
-        self._client = client
-
-    @property
-    def client(self) -> anthropic.Anthropic:
-        if self._client is None:
-            if not self.settings.anthropic_api_key:
-                raise CopilotError("The assistant is not configured yet (missing API key).")
-            self._client = anthropic.Anthropic(api_key=self.settings.anthropic_api_key, max_retries=2)
-        return self._client
+        if provider is None:
+            provider = AnthropicProvider(model=settings.model, client=client) if client else build_provider(settings)
+        self.provider = provider
 
     def reply(self, persona_id: str, session_id: str, messages: list[dict]) -> Reply:
         persona = self.personas.get(persona_id)
@@ -91,47 +84,28 @@ class Copilot:
                           webhook_url=self.settings.lead_webhook_url,
                           lead_captured=session["lead_captured"])
 
-        system = [
-            {"type": "text", "text": persona.system_prompt(), "cache_control": {"type": "ephemeral"}},
-            {"type": "text", "text": self._session_note(ctx, session)},
-        ]
-        tools = tool_definitions(persona)
-        convo: list[dict] = list(history)
-        texts: list[str] = []
-        usage = {"input_tokens": 0, "output_tokens": 0}
-
-        for _ in range(MAX_TOOL_ROUNDS + 1):
-            try:
-                kwargs = dict(model=persona.model or self.settings.model, max_tokens=persona.max_tokens,
-                              system=system, messages=convo)
-                if tools:
-                    kwargs["tools"] = tools
-                resp = self.client.messages.create(**kwargs)
-            except anthropic.APIError as exc:
-                log.error("anthropic error: %s", exc)
+        try:
+            result = self.provider.complete(
+                system=persona.system_prompt(), session_note=self._session_note(ctx, session),
+                history=history, tools=tool_definitions(persona), max_tokens=persona.max_tokens,
+                model=persona.model, run_tool=lambda name, args: run_tool(name, args, ctx))
+        except ProviderError as exc:
+            log.error("%s error: %s", self.provider.name, exc)
+            if exc.retry_after is not None:
                 raise CopilotError(
-                    f"The assistant is temporarily unavailable. You can reach us directly: {persona.contact_url}"
-                ) from exc
+                    "The assistant is busy right now. Please try again in a minute, "
+                    f"or reach us directly: {persona.contact_url}", status=429) from exc
+            raise CopilotError(
+                f"The assistant is temporarily unavailable. You can reach us directly: {persona.contact_url}"
+            ) from exc
 
-            usage["input_tokens"] += getattr(resp.usage, "input_tokens", 0) or 0
-            usage["output_tokens"] += getattr(resp.usage, "output_tokens", 0) or 0
-            texts.extend(b.text for b in resp.content if b.type == "text" and b.text.strip())
-
-            tool_calls = [b for b in resp.content if b.type == "tool_use"]
-            if resp.stop_reason != "tool_use" or not tool_calls:
-                break
-            convo.append({"role": "assistant", "content": [b.model_dump(exclude_none=True) for b in resp.content]})
-            convo.append({"role": "user", "content": [
-                {"type": "tool_result", "tool_use_id": call.id, "content": run_tool(call.name, call.input or {}, ctx)}
-                for call in tool_calls
-            ]})
-
-        self.store.add_usage(usage["input_tokens"], usage["output_tokens"])
+        usage = {"input_tokens": result.input_tokens, "output_tokens": result.output_tokens}
+        self.store.add_usage(result.input_tokens, result.output_tokens)
         self.store.bump_turn(session_id)
 
-        text = "\n\n".join(texts).strip()
+        text = "\n\n".join(result.texts).strip()
         if not text:
-            text = "Done — see above." if ctx.actions else "Sorry, I didn't catch that. Could you rephrase?"
+            text = "Done — see below." if ctx.actions else "Sorry, I didn't catch that. Could you rephrase?"
         return Reply(text=text, actions=_dedupe(ctx.actions), lead_captured=ctx.lead_captured, usage=usage)
 
     @staticmethod

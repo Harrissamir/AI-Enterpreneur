@@ -7,6 +7,11 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
+      # "groq" = free tier (get a key at console.groq.com); "anthropic" = Claude (prepaid credit).
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ADMIN_TOKEN
@@ -15,8 +20,10 @@ services:
         sync: false
       - key: COPILOT_MODEL
         value: claude-haiku-4-5-20251001
+      # Groq's free tier allows ~200,000 tokens a day; stop slightly earlier with a polite message.
+      # Raise this (e.g. 1500000) if you switch to Claude.
       - key: DAILY_TOKEN_BUDGET
-        value: "1500000"
+        value: "180000"
     # Without a persistent disk, the SQLite lead log resets on each deploy.
     # Leads are still delivered through LEAD_WEBHOOK_URL. On a paid plan (change plan above), uncomment:
     # disk:

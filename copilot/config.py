@@ -38,6 +38,10 @@ def _list(name: str) -> list[str]:
 
 @dataclass
 class Settings:
+    # "groq" (free tier, open models) or "anthropic" (Claude, prepaid).
+    llm_provider: str = field(default_factory=lambda: os.getenv("LLM_PROVIDER", "anthropic").strip().lower())
+    groq_api_key: str = field(default_factory=lambda: os.getenv("GROQ_API_KEY", ""))
+    groq_model: str = field(default_factory=lambda: os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
     anthropic_api_key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
     model: str = field(default_factory=lambda: os.getenv("COPILOT_MODEL", "claude-haiku-4-5-20251001"))
     personas_dir: Path = field(default_factory=lambda: Path(os.getenv("PERSONAS_DIR", ROOT / "personas")))

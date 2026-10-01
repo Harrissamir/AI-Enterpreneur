@@ -158,3 +158,65 @@ def test_api_origin_check_rate_limit_and_admin(settings):
     assert api.get("/v1/leads").status_code == 401
     assert api.get("/v1/leads", headers={"Authorization": "Bearer secret"}).status_code == 200
     assert api.get("/widget.js").status_code == 200
+
+
+# --- Groq / OpenAI-compatible provider -------------------------------------------------
+import json as _json
+
+import httpx
+
+from copilot.providers import OpenAICompatProvider
+
+
+def groq_bot(settings, responses):
+    """responses: list of (status, body_dict, headers) played in order; returns bot and request log."""
+    seen = []
+
+    def handler(request: httpx.Request):
+        seen.append(_json.loads(request.content))
+        status, body, headers = responses.pop(0)
+        return httpx.Response(status, json=body, headers=headers or {})
+
+    provider = OpenAICompatProvider(name="groq", api_key="gsk_test", base_url="https://api.groq.com/openai/v1",
+                                    model="openai/gpt-oss-120b", extra_body={"reasoning_effort": "low"},
+                                    http=httpx.Client(transport=httpx.MockTransport(handler)), max_wait_seconds=0.01)
+    bot = Copilot(settings, Store(settings.db_path), load_personas(settings.personas_dir), provider=provider)
+    return bot, seen
+
+
+def chat_response(content=None, tool_calls=None):
+    msg = {"role": "assistant", "content": content}
+    if tool_calls:
+        msg["tool_calls"] = tool_calls
+    return {"choices": [{"message": msg}], "usage": {"prompt_tokens": 300, "completion_tokens": 40}}
+
+
+def test_groq_tool_loop_and_format(settings):
+    call = {"id": "call_1", "type": "function",
+            "function": {"name": "offer_booking", "arguments": _json.dumps({"reason": "Scope your hire"})}}
+    bot, seen = groq_bot(settings, [
+        (200, chat_response(None, [call]), None),
+        (200, chat_response("Happy to help — use the button below."), None),
+    ])
+    r = bot.reply("harris_sons", "session-groq", [{"role": "user", "content": "how do we start?"}])
+    assert r.text == "Happy to help — use the button below."
+    assert r.actions[0]["type"] == "book_call"
+    first, second = seen
+    assert first["messages"][0]["role"] == "system" and "Labour Codes" in first["messages"][0]["content"]
+    assert first["reasoning_effort"] == "low"
+    assert {t["function"]["name"] for t in first["tools"]} == {"capture_lead", "offer_booking", "draft_role_brief"}
+    assert second["messages"][-1]["role"] == "tool" and second["messages"][-1]["tool_call_id"] == "call_1"
+    assert bot.store.tokens_today() == 680
+
+
+def test_groq_rate_limit_retries_then_friendly_error(settings):
+    bot, seen = groq_bot(settings, [
+        (429, {"error": {"message": "TPM"}}, {"retry-after": "0"}),
+        (200, chat_response("ok after wait"), None),
+    ])
+    assert bot.reply("harris_sons", "session-r1", [{"role": "user", "content": "hi"}]).text == "ok after wait"
+
+    bot2, _ = groq_bot(settings, [(429, {"error": {"message": "TPD"}}, {"retry-after": "3600"})])
+    with pytest.raises(CopilotError) as e:
+        bot2.reply("harris_sons", "session-r2", [{"role": "user", "content": "hi"}])
+    assert e.value.status == 429 and "busy" in str(e.value)

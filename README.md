@@ -14,10 +14,10 @@ One engine, several **personas** (one per brand). It ships with two:
 ## How it works
 
 ```
-Visitor's browser                      Your API (this repo, e.g. on Render)          Anthropic
+Visitor's browser                      Your API (this repo, e.g. on Render)          Groq / Claude
 ┌──────────────────────┐  POST /v1/chat ┌──────────────────────────────────┐  messages ┌────────┐
-│ widget.js on a       │ ─────────────▶ │ origin check → rate limit →      │ ────────▶ │ Claude │
-│ Lovable site         │ ◀───────────── │ daily budget → persona prompt +  │ ◀──────── │        │
+│ widget.js on a       │ ─────────────▶ │ origin check → rate limit →      │ ────────▶ │  LLM   │
+│ Lovable site         │ ◀───────────── │ daily budget → persona prompt +  │ ◀──────── │ (model)│
 │ (one <script> tag)   │ reply+actions  │ knowledge → tools                │           └────────┘
 └──────────────────────┘                │   capture_lead  → SQLite + webhook ──▶ Zapier → Gmail/Sheets
                                         │   offer_booking → "Book a call" button
@@ -29,11 +29,22 @@ Visitor's browser                      Your API (this repo, e.g. on Render)     
 - **Guardrails:** each persona only answers on its own websites; per-visitor rate limit; per-conversation turn limit; a daily token budget that switches the assistant to a "contact us directly" message when reached; leads are saved only with explicit consent.
 - **Leads** go to SQLite and, if `LEAD_WEBHOOK_URL` is set, are POSTed as JSON (name, email, company, need, hiring brief) — point it at a Zapier Catch Hook to get an email and a Google Sheet row per lead.
 
+## Choosing the AI model
+
+Set `LLM_PROVIDER`:
+
+| Value | Cost | Notes |
+|---|---|---|
+| `groq` | Free tier | Open model `openai/gpt-oss-120b`. Free limits are roughly 200,000 tokens a day and 8,000 a minute — about 40–50 visitor messages a day. The server waits and retries briefly on per-minute limits and shows a polite "busy" message otherwise. |
+| `anthropic` | Prepaid credit | Claude Haiku by default (`COPILOT_MODEL`). Stronger instruction-following on legal nuance; no daily cap beyond `DAILY_TOKEN_BUDGET`. |
+
+Switching is one environment variable on Render — no code change.
+
 ## Run it locally
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env            # then paste your ANTHROPIC_API_KEY
+cp .env.example .env            # then paste your GROQ_API_KEY (or ANTHROPIC_API_KEY)
 uvicorn copilot.api:app --reload
 ```
 
@@ -47,7 +58,7 @@ python -m copilot.cli --persona harris_sons --leads    # list captured leads
 ## Deploy (Render)
 
 1. On render.com: **New + → Blueprint** → choose this repository. `render.yaml` sets everything up.
-2. Fill in `ANTHROPIC_API_KEY` and (recommended) `LEAD_WEBHOOK_URL`. `ADMIN_TOKEN` is generated for you.
+2. Fill in `GROQ_API_KEY` (free, from console.groq.com) and `LEAD_WEBHOOK_URL` (or `none`). `ANTHROPIC_API_KEY` can be `none` until you switch to Claude. `ADMIN_TOKEN` is generated for you.
 3. When it is live, check `https://<your-service>.onrender.com/health`.
 
 Notes: free instances sleep when idle, so the first message after a quiet spell can take ~a minute. Without a persistent disk the SQLite lead log resets on each deploy — the webhook is your durable copy.
