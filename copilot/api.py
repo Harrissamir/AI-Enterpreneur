@@ -95,7 +95,9 @@ def create_app(settings: Settings | None = None, copilot: Copilot | None = None)
         if persona is None:
             raise HTTPException(status_code=404, detail="Unknown assistant")
         origin = (request.headers.get("origin") or "").rstrip("/")
-        if origin and origin not in persona.allowed_origins and origin not in settings.extra_origins:
+        same_site = origin.split("://", 1)[-1] == request.headers.get("host", "")  # the /demo page
+        if origin and not same_site and origin not in persona.allowed_origins \
+                and origin not in settings.extra_origins:
             raise HTTPException(status_code=403, detail="This assistant is not enabled for this website")
         if not limiter.allow(client_ip(request)):
             raise CopilotError("You're sending messages quickly — please wait a few minutes.", status=429)

@@ -132,8 +132,9 @@ def test_daily_budget_and_turn_limit(settings):
 
 
 def test_api_origin_check_rate_limit_and_admin(settings):
-    settings.rate_limit_messages = 2
-    bot, _ = make(settings, [([text("hello")], "end_turn"), ([text("again")], "end_turn")])
+    settings.rate_limit_messages = 3
+    bot, _ = make(settings, [([text("demo")], "end_turn"), ([text("hello")], "end_turn"),
+                             ([text("again")], "end_turn")])
     api = TestClient(create_app(settings, bot))
     body = {"persona": "harris_sons", "session_id": "session-api",
             "messages": [{"role": "user", "content": "hi"}]}
@@ -142,6 +143,8 @@ def test_api_origin_check_rate_limit_and_admin(settings):
     assert api.get("/v1/personas/veraxis").json()["brand"] == "VERAXIS Advisory"
     bad = api.post("/v1/chat", json=body, headers={"Origin": "https://evil.example"})
     assert bad.status_code == 403
+    demo = api.post("/v1/chat", json=body, headers={"Origin": "http://testserver"})  # same-site /demo
+    assert demo.status_code == 200
     wrong_site = api.post("/v1/chat", json={**body, "persona": "veraxis"},
                           headers={"Origin": "https://harrisandsons.lovable.app"})
     assert wrong_site.status_code == 403
