@@ -231,12 +231,41 @@
 
   window.BusinessCopilot = { open: open, close: close, ask: ask };
 
+  // Never sit on top of the host site's own bottom bars (cookie banners, badges):
+  // lift the launcher above any visible fixed element docked at the bottom of the screen.
+  var dodgeTimer = null;
+  function dodge() {
+    if (!els.launch) return;
+    var vh = window.innerHeight, vw = window.innerWidth, lift = 0;
+    var nodes = document.body ? document.body.querySelectorAll("*") : [];
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      if (el === host) continue;
+      var cs = window.getComputedStyle(el);
+      if (cs.position !== "fixed" && cs.position !== "sticky") continue;
+      if (cs.display === "none" || cs.visibility === "hidden" || parseFloat(cs.opacity) === 0) continue;
+      var r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0 || r.height > vh * 0.6) continue;
+      if (vh - r.bottom > 40) continue; // not docked at the bottom
+      var nearSide = POSITION === "right" ? r.right > vw - 260 : r.left < 260;
+      if (!nearSide) continue;
+      lift = Math.max(lift, vh - r.top);
+    }
+    els.launch.style.bottom = (lift ? lift + 12 : 20) + "px";
+  }
+  function scheduleDodge() { clearTimeout(dodgeTimer); dodgeTimer = setTimeout(dodge, 250); }
+
   fetch(API + "/v1/personas/" + encodeURIComponent(PERSONA))
     .then(function (r) { if (!r.ok) throw new Error("persona"); return r.json(); })
     .then(function (c) {
       config = c;
       (document.body || document.documentElement).appendChild(host);
       build();
+      dodge();
+      window.addEventListener("resize", scheduleDodge);
+      if (window.MutationObserver) {
+        new MutationObserver(scheduleDodge).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "hidden"] });
+      }
       if (script.getAttribute("data-open") === "true") open();
     })
     .catch(function () { /* fail silently: never break the host website */ });
